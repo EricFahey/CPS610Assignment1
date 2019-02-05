@@ -1,15 +1,9 @@
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.concurrent.Semaphore;
 
 /**
  * @author Eric Fahey <eric.fahey@ryerson.ca>
  */
-public class DatabaseConnection extends Thread {
-
-    private static Semaphore semaphore = new Semaphore(1);
-    private static int threadCount = 0;
-
+public class DatabaseConnection {
 
     private final String hostname;
     private final int port;
@@ -18,9 +12,6 @@ public class DatabaseConnection extends Thread {
     private final ServiceType serviceType;
 
     private Connection connection;
-    private int site;
-    private Runnable task;
-    private boolean success;
 
     public DatabaseConnection(String hostname, int port, String username, String password, ServiceType serviceType) {
         this.hostname = hostname;
@@ -30,80 +21,76 @@ public class DatabaseConnection extends Thread {
         this.serviceType = serviceType;
     }
 
-    public void start() {
+    public boolean connect() {
         try {
-            this.connection = DriverManager.getConnection(getURL());
-            this.site = ++threadCount;
-            System.out.println("Successfully Created Connection " + site);
+            String url = getURL();
+            this.connection = DriverManager.getConnection(url);
+            System.out.println("Successfully Created Connection to site " + getSite() + "!");
             this.connection.setAutoCommit(false);
-            this.start();
+            return true;
         } catch (SQLException e) {
             e.printStackTrace();
         }
+        return  false;
     }
 
-    //Called by Thread.start()
-    public void run() {
+    public boolean isUnique(String name) {
         try {
-            semaphore.acquire();
-            task.run();
-        } catch (Exception e) {
+            Statement statement = connection.createStatement();
+            ResultSet resultSet = statement.executeQuery("SELECT NAME FROM STUDENT");
+            boolean found = false;
+            while (resultSet.next()) {
+                if (resultSet.getString("Name").equals(name)) {
+                    found = true;
+                }
+
+            }
+            if (!found) {
+                System.out.println(name + " doesn't exist in site " + getSite() + "!");
+                return true;
+            }
+        } catch (SQLException e) {
+            System.out.println("Unable to Query Student Table");
             e.printStackTrace();
         }
-        semaphore.release();
+        System.out.println(name + " already exists in site " + getSite() + "!");
+        return false;
     }
 
-    public void insertName(final String name) {
-        this.task = () -> {
-            try {
-                ArrayList<String> names = new ArrayList<>();
-                Statement statement;
-                ResultSet resultSet;
-                try {
-                    statement = connection.createStatement();
-                    resultSet = statement.executeQuery("SELECT NAME FROM STUDENT");
-                    while (resultSet.next()) {
-                        names.add(resultSet.getString("Name"));
-                    }
-                } catch (SQLException e) {
-                    System.out.println("Unable to Query Student Table");
-                    throw e;
-                }
-                if (names.contains(name)) {
-                    System.out.println("Name Already Exists in Database Site " + site);
-                } else {
-                    try {
-                        statement = connection.createStatement();
-                        statement.executeQuery("INSERT INTO STUDENT VALUES('" + name + "')");
-                        success = true;
-//                        connection.commit();
-                    } catch (SQLException e) {
-                        System.out.println("Unable to Insert " + name + " in Student Table");
-                        throw e;
-                    }
-                }
-            } catch (SQLException e) {
-                e.printStackTrace();
-                success = false;
-            }
-            //Gracefully Close
-            try {
-                if (connection != null) {
-                    connection.close();
-                }
-            } catch (SQLException e) {
-                System.out.println("Error Closing Connection for Site " + site);
-                e.printStackTrace();
-            }
-        };
+    public boolean insertName(String name) {
+        try {
+            Statement statement = connection.createStatement();
+            statement.executeQuery("INSERT INTO STUDENT VALUES('" + name + "')");
+            return true;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        System.out.println("Unable to Insert " + name + " to site " + getSite() + "!");
+        return false;
     }
 
-    public static Semaphore getSemaphore() {
-        return semaphore;
+    public boolean deleteName(String name) {
+        try {
+            Statement statement = connection.createStatement();
+            statement.executeQuery("DELETE FROM STUDENT WHERE NAME = '" + name + "'");
+            return true;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        System.out.println("Unable to delete " + name + " from site " + getSite() + "!");
+        return false;
     }
 
     public Connection getConnection() {
         return connection;
+    }
+
+    public int getSite() {
+        if (port == 1522)
+            return 1;
+        else if (port == 1523)
+            return 2;
+        return 0;
     }
 
     public String getURL() {

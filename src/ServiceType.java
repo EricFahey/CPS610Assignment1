@@ -1,5 +1,5 @@
 /**
- * @author Eric Fahey <eric.fahey@cgi.com>
+ * @author Eric Fahey <eric.fahey@ryerson.ca>
  */
 public enum ServiceType {
 

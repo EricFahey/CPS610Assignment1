@@ -1,24 +1,33 @@
-import javax.xml.crypto.Data;
 import java.util.ArrayList;
 
 /**
- * @author Eric Fahey <eric.fahey@cgi.com>
+ * @author Eric Fahey <eric.fahey@ryerson.ca>
  */
 public class Replication {
 
-    public static ArrayList<DatabaseConnection> connections = new ArrayList<>();
+    public static final int THREADS = 2;
+
+    public static ArrayList<Transaction> transactions = new ArrayList<>();
 
     public static void main(String[] args) {
-        connections.add(new DatabaseConnection("localhost", 1522, "SYSTEM", "admin", ServiceType.XE));
-        connections.add(new DatabaseConnection("localhost", 1523, "SYSTEM", "admin", ServiceType.XE));
+        try {
+            //Create Transactions and create DB connections
+            for (int i = 0; i < THREADS; i++) {
+                Transaction transaction = new Transaction();
+                transactions.add(transaction);
+            }
 
-        for (DatabaseConnection connection : connections) {
-            connection.insertName("Eric Fahey");
-            connection.start();
-        }
+            //Start the threads
+            for (Transaction transaction : transactions) {
+                transaction.start();
+            }
 
-        for (DatabaseConnection connection : connections) {
-            if
+            //Exit the threads
+            for (Transaction transaction : transactions) {
+                transaction.join();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
